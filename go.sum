@@ -1,0 +1,4 @@
+github.com/go-ruby-jwt/jwt v0.0.0-20260702205900-15884789dfbf h1:W9pF7ZELPSwF6MZ6HOB5xNV66Uiywbc0S9pUhLkj66U=
+github.com/go-ruby-jwt/jwt v0.0.0-20260702205900-15884789dfbf/go.mod h1:lXzMyvgfYye7tZm1cY9ej2SbXzAdJdA2IAiY+niM+nU=
+github.com/go-ruby-oauth2/oauth2 v0.0.0-20260702151234-88fab8d845a1 h1:iZFtIn5WHQRz/oa04qYAlLvTi0XDRP5dKPGpJTGRzKg=
+github.com/go-ruby-oauth2/oauth2 v0.0.0-20260702151234-88fab8d845a1/go.mod h1:/yz3iBLTlChPKMqrP0uA5tBpXKh4a8Rwd46SAv/lMiw=
