@@ -5,7 +5,6 @@
 package oidc
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"testing"
@@ -76,30 +75,6 @@ func TestParseJWKS_KeyBuildErrors(t *testing.T) {
 				t.Fatalf("want ErrJWKS, got %v", err)
 			}
 		})
-	}
-}
-
-func TestCurveByName(t *testing.T) {
-	for _, name := range []string{"P-256", "P-384", "P-521"} {
-		if _, err := curveByName(name); err != nil {
-			t.Errorf("curveByName(%q): %v", name, err)
-		}
-	}
-	if _, err := curveByName("P-000"); err == nil {
-		t.Error("want error for unknown curve")
-	}
-}
-
-func TestB64URL(t *testing.T) {
-	if b, err := b64url("YWJj"); err != nil || string(b) != "abc" {
-		t.Errorf("raw: %q %v", b, err)
-	}
-	// A padded (standard-url) encoding falls back to the padded decoder.
-	if b, err := b64url(base64.URLEncoding.EncodeToString([]byte("hi"))); err != nil || string(b) != "hi" {
-		t.Errorf("padded: %q %v", b, err)
-	}
-	if _, err := b64url("@@@"); err == nil {
-		t.Error("want error for invalid base64")
 	}
 }
 

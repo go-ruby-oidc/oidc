@@ -6,16 +6,12 @@ package oidc
 
 import (
 	"crypto"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rsa"
-	"encoding/base64"
-	"encoding/json"
-	"math/big"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/go-ruby-jwt/jwt"
 )
 
 // Key is one parsed JSON Web Key: a provider-assigned kid/alg/use and the RSA or
@@ -97,125 +93,23 @@ func algMatchesKty(alg, kty string) bool {
 	}
 }
 
-// jwkJSON is the wire shape of a single JWK member this library reads.
-type jwkJSON struct {
-	Kty string `json:"kty"`
-	Kid string `json:"kid"`
-	Alg string `json:"alg"`
-	Use string `json:"use"`
-	N   string `json:"n"`
-	E   string `json:"e"`
-	Crv string `json:"crv"`
-	X   string `json:"x"`
-	Y   string `json:"y"`
-}
-
-// jwksJSON is the wire shape of a key set.
-type jwksJSON struct {
-	Keys []jwkJSON `json:"keys"`
-}
-
-// ParseJWKS decodes a JSON Web Key Set. RSA and EC keys are materialised into
-// crypto public keys; a key of any other type (e.g. an "oct" symmetric key) is
-// skipped, matching a client that ignores keys it cannot use for JWS verification.
+// ParseJWKS decodes a JSON Web Key Set by delegating the RFC 7517 import to
+// go-ruby-jwt's transport-agnostic ParseJWKS, then adapting each imported *jwt.JWK
+// into this package's [Key]. The delegate materialises RSA and EC keys into crypto
+// public keys and skips a key of any other type (e.g. an "oct" symmetric key),
+// matching a client that ignores keys it cannot use for JWS verification; a key of
+// a supported type with malformed material fails the whole set. Its jwt errors are
+// re-wrapped under [ErrJWKS] so callers keep matching the OIDC error family.
 func ParseJWKS(data []byte) (*KeySet, error) {
-	var doc jwksJSON
-	if err := json.Unmarshal(data, &doc); err != nil {
-		return nil, wrapError(ErrJWKS, "jwks: malformed JSON: "+err.Error(), err)
+	js, err := jwt.ParseJWKS(data)
+	if err != nil {
+		return nil, wrapError(ErrJWKS, "jwks: "+err.Error(), err)
 	}
 	set := &KeySet{}
-	for _, j := range doc.Keys {
-		pub, err := publicKeyFromJWK(j)
-		if err != nil {
-			return nil, err
-		}
-		if pub == nil { // unsupported key type — skip it.
-			continue
-		}
-		set.keys = append(set.keys, &Key{Kid: j.Kid, Kty: j.Kty, Alg: j.Alg, Use: j.Use, pub: pub})
+	for _, j := range js.Keys() {
+		set.keys = append(set.keys, &Key{Kid: j.Kid, Kty: j.Kty, Alg: j.Alg, Use: j.Use, pub: j.PublicKey()})
 	}
 	return set, nil
-}
-
-// publicKeyFromJWK builds the crypto public key for a JWK, returning (nil, nil)
-// for an unsupported key type so the caller skips it.
-func publicKeyFromJWK(j jwkJSON) (crypto.PublicKey, error) {
-	switch j.Kty {
-	case "RSA":
-		return rsaFromJWK(j)
-	case "EC":
-		return ecFromJWK(j)
-	default:
-		return nil, nil
-	}
-}
-
-// rsaFromJWK builds an *rsa.PublicKey from the base64url modulus and exponent.
-func rsaFromJWK(j jwkJSON) (crypto.PublicKey, error) {
-	nb, err := b64url(j.N)
-	if err != nil {
-		return nil, wrapError(ErrJWKS, "jwks: bad RSA modulus: "+err.Error(), err)
-	}
-	eb, err := b64url(j.E)
-	if err != nil {
-		return nil, wrapError(ErrJWKS, "jwks: bad RSA exponent: "+err.Error(), err)
-	}
-	if len(nb) == 0 || len(eb) == 0 {
-		return nil, newError(ErrJWKS, "jwks: RSA key missing modulus or exponent")
-	}
-	e := new(big.Int).SetBytes(eb)
-	if !e.IsInt64() || e.Int64() < 1 {
-		return nil, newError(ErrJWKS, "jwks: RSA exponent out of range")
-	}
-	return &rsa.PublicKey{N: new(big.Int).SetBytes(nb), E: int(e.Int64())}, nil
-}
-
-// ecFromJWK builds an *ecdsa.PublicKey from the curve name and base64url
-// coordinates. An off-curve point is left to the verifier to reject (ecdsa.Verify
-// returns false), so no explicit on-curve check is duplicated here.
-func ecFromJWK(j jwkJSON) (crypto.PublicKey, error) {
-	crv, err := curveByName(j.Crv)
-	if err != nil {
-		return nil, err
-	}
-	xb, err := b64url(j.X)
-	if err != nil {
-		return nil, wrapError(ErrJWKS, "jwks: bad EC x: "+err.Error(), err)
-	}
-	yb, err := b64url(j.Y)
-	if err != nil {
-		return nil, wrapError(ErrJWKS, "jwks: bad EC y: "+err.Error(), err)
-	}
-	if len(xb) == 0 || len(yb) == 0 {
-		return nil, newError(ErrJWKS, "jwks: EC key missing coordinate")
-	}
-	return &ecdsa.PublicKey{
-		Curve: crv,
-		X:     new(big.Int).SetBytes(xb),
-		Y:     new(big.Int).SetBytes(yb),
-	}, nil
-}
-
-// curveByName maps a JWA curve name to its elliptic.Curve.
-func curveByName(name string) (elliptic.Curve, error) {
-	switch name {
-	case "P-256":
-		return elliptic.P256(), nil
-	case "P-384":
-		return elliptic.P384(), nil
-	case "P-521":
-		return elliptic.P521(), nil
-	default:
-		return nil, newError(ErrJWKS, "jwks: unsupported EC curve "+name)
-	}
-}
-
-// b64url decodes a base64url segment, accepting the padded and unpadded forms.
-func b64url(s string) ([]byte, error) {
-	if b, err := base64.RawURLEncoding.DecodeString(s); err == nil {
-		return b, nil
-	}
-	return base64.URLEncoding.DecodeString(s)
 }
 
 // FetchJWKS retrieves and parses a key set from a JWKS URI over the HTTP seam,
