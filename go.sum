@@ -6,3 +6,5 @@ github.com/go-ruby-oauth2/oauth2 v0.0.0-20260702151234-88fab8d845a1 h1:iZFtIn5WH
 github.com/go-ruby-oauth2/oauth2 v0.0.0-20260702151234-88fab8d845a1/go.mod h1:/yz3iBLTlChPKMqrP0uA5tBpXKh4a8Rwd46SAv/lMiw=
 github.com/go-ruby-oauth2/oauth2 v0.0.0-20260717071155-ed422c317bcd h1:sySLmH8w2T61qLcoHj/NgYQ7QUSDLvGEeuYj4tWxN9k=
 github.com/go-ruby-oauth2/oauth2 v0.0.0-20260717071155-ed422c317bcd/go.mod h1:/yz3iBLTlChPKMqrP0uA5tBpXKh4a8Rwd46SAv/lMiw=
+github.com/go-ruby-oauth2/oauth2 v0.0.0-20260916095803-9bbe291c2c47 h1:kvG94brPmmFJaEEY5Bk/MUR8GKHd9ZbFgmciOe1Ov0A=
+github.com/go-ruby-oauth2/oauth2 v0.0.0-20260916095803-9bbe291c2c47/go.mod h1:/yz3iBLTlChPKMqrP0uA5tBpXKh4a8Rwd46SAv/lMiw=
